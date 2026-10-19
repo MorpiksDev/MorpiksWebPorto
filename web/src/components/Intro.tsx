@@ -49,33 +49,49 @@ export function Intro({ reduced, onComplete, onWordsLanded }: IntroProps) {
   const [ready, setReady] = useState(false);
   const [exits, setExits] = useState<{ brand: WordExit; solutions: WordExit } | null>(null);
 
+  // Intro clock starts only after the scramble is set and the logo has painted once, so a slow network/JS
+  // load on production cannot start the timers before the logo exists (which made it re-animate).
   useEffect(() => {
     if (!reduced) setScramble(createScramble());
     setReady(true);
 
-    // Measure each word's header target first, commit it, then start the exit on the next frame so the
-    // exit prop is already set when AnimatePresence unmounts the intro.
-    const finish = () => {
-      if (reduced) {
-        onComplete();
-        return;
-      }
-      const brand = measureWordExit(INTRO_WORDS.brand, HEADER_WORDS.brand);
-      const solutions = measureWordExit(INTRO_WORDS.solutions, HEADER_WORDS.solutions);
-      setExits(brand && solutions ? { brand, solutions } : null);
-      requestAnimationFrame(onComplete);
+    let raf1 = 0;
+    let raf2 = 0;
+    let completeId = 0;
+    let landedId = 0;
+
+    // Start the clock only after two frames: the scramble state has committed and the logo has painted once.
+    // Without this, a slow production bundle can start the timers before the logo exists, and it re-animates.
+    const startClock = () => {
+      // Measure each word's header target first, commit it, then start the exit on the next frame so the
+      // exit prop is already set when AnimatePresence unmounts the intro.
+      const finish = () => {
+        if (reduced) {
+          onComplete();
+          return;
+        }
+        const brand = measureWordExit(INTRO_WORDS.brand, HEADER_WORDS.brand);
+        const solutions = measureWordExit(INTRO_WORDS.solutions, HEADER_WORDS.solutions);
+        setExits(brand && solutions ? { brand, solutions } : null);
+        requestAnimationFrame(onComplete);
+      };
+
+      // Reduced motion has no word travel, so the header words are shown with the overlay exit.
+      const finishAt = reduced ? 800 : INTRO_TOTAL_MS;
+      completeId = window.setTimeout(finish, finishAt);
+
+      // Header words take over exactly when the intro words land, so the handoff has no empty frame.
+      const landedAt = reduced ? finishAt : INTRO_TOTAL_MS + WORD_STAGGER_MS + WORD_EXIT_MS;
+      landedId = window.setTimeout(() => onWordsLanded?.(), landedAt);
     };
 
-    // Reduced motion has no word travel, so the header words are shown with the overlay exit.
-    const finishAt = reduced ? 800 : INTRO_TOTAL_MS;
-    const completeId = window.setTimeout(finish, finishAt);
-
-    // Header words take over exactly when the intro words land, so the handoff has no empty frame.
-    const landedId = reduced
-      ? window.setTimeout(() => onWordsLanded?.(), finishAt)
-      : window.setTimeout(() => onWordsLanded?.(), INTRO_TOTAL_MS + WORD_STAGGER_MS + WORD_EXIT_MS);
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(startClock);
+    });
 
     return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
       window.clearTimeout(completeId);
       window.clearTimeout(landedId);
     };
