@@ -411,6 +411,7 @@ export function Experience() {
           brandVisible={phase === "done" && logoOwner === "header" && !flight}
           instant={!reduced}
           wordsRevealed={wordsRevealed}
+          introDone={phase === "done"}
           slotOpen={logoOwner === "header" || flight !== null}
         />
 
