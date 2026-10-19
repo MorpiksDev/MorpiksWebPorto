@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* PRD 4: palette. No gradients, shadows, or borders anywhere. */
+@theme {
+  --color-obsidian: #111111;
+  --color-graphite: #333333;
+  --color-steel: #777777;
+  --color-mist: #d9d9d9;
+  --color-offwhite: #fafafa;
+
+  /* PRD 5: SF Pro on Apple devices, Inter elsewhere. */
+  --font-sans: -apple-system, "SF Pro Display", var(--font-inter), system-ui, sans-serif;
+  /* PRD 3.4: brand wordmark. */
+  --font-brand: var(--font-montserrat), sans-serif;
+
+  --ease-apple: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-offwhite);
+  color: var(--color-obsidian);
+}
+
+body {
+  font-family: var(--font-sans);
+  overflow: hidden; /* All scrolling happens inside the snap containers. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-obsidian);
+  color: var(--color-offwhite);
+}
+
+/* PRD 11: visible focus without shadows or borders. Use a background change. */
+:focus {
+  outline: none;
+}
+
+/* Snap containers (PRD 8.4, 9) */
+.snap-y-container {
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+
+.snap-x-container {
+  display: flex;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.snap-y-container::-webkit-scrollbar,
+.snap-x-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Disabled while Framer Motion drives the scroll position, so native snap doesn't fight it. */
+.snap-paused {
+  scroll-snap-type: none !important;
+}
+
+.snap-panel {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/* Slider progress: CSS animation drives both the bar and the auto-advance (animationend). */
+@keyframes progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.progress-fill {
+  transform-origin: left center;
+  animation: progress-fill 5s linear forwards;
+}
+
+/* Shard stacking: each shard is an HTML layer so 3D transforms work in every browser. */
+.header-surface {
+  background-color: rgba(250, 250, 250, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.logo-stage {
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.logo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  backface-visibility: visible;
+  will-change: transform;
+}
+
+.logo-layer svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.logo-layer polygon {
+  pointer-events: visiblePainted;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+}
