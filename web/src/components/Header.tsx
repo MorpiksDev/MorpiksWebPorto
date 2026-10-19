@@ -18,8 +18,6 @@ interface HeaderProps {
   wordsRevealed?: boolean;
   /** Logo slot is open (takes width). Closed only after the logo has landed in the contact view. */
   slotOpen?: boolean;
-  /** True once the intro has finished and the header owns the shared logo layout. */
-  introDone?: boolean;
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -53,7 +51,6 @@ export function Header({
   instant = false,
   wordsRevealed = true,
   slotOpen = true,
-  introDone = true,
 }: HeaderProps) {
   const { t } = useLanguage();
   const logoWidth = useLogoWidth();
@@ -81,12 +78,8 @@ export function Header({
             transition={{ duration: instant ? 0 : 0.45, ease: EASE }}
             aria-hidden={!brandVisible || undefined}
           >
-            {/* Shared layoutIds are only attached once the intro is done, so the intro logo owns them during load. */}
-            <ChameleonLogo
-              shardLayoutPrefix={introDone ? "brand-chameleon" : undefined}
-              className="w-full"
-              interactive={brandVisible}
-            />
+            {/* Shared layoutIds stay attached so the intro shards can fly into this logo on exit. */}
+            <ChameleonLogo shardLayoutPrefix="brand-chameleon" className="w-full" interactive={brandVisible} />
           </motion.div>
         </motion.div>
         <motion.button
