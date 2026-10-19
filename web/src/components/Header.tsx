@@ -57,7 +57,7 @@ export function Header({
 
   return (
     <header className="header-surface fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 py-3 transition-colors sm:px-10 sm:py-4">
-      <div className="flex items-center gap-2.5 rounded-full bg-mist/40 px-3 py-1.5 backdrop-blur-sm sm:gap-3.5 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      <div className="flex items-center gap-2.5 sm:gap-3.5">
         {/*
          * Logo slot: collapses to zero width while the contact view owns the logo, so the wordmark slides left
          * to close the gap, and re-expands when the logo flies back. Width is animated via the layout system
@@ -82,9 +82,7 @@ export function Header({
           </motion.div>
         </motion.div>
         <motion.button
-          initial={{ opacity: wordsRevealed ? 1 : 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2, ease: EASE }}
+          initial={false}
           type="button"
           id="header-home"
           onClick={onHome}

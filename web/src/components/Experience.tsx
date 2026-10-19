@@ -12,8 +12,6 @@ import { Slider } from "./Slider";
 import { SLIDES, type Subject } from "@/lib/content";
 
 const NAV_REVEAL_DELAY_MS = 500; // PRD 6.3
-// Intro word exit: 120ms stagger + 850ms travel, so the header words are revealed as they land.
-const WORD_LAND_MS = 120 + 850;
 const SCROLL_DURATION = 0.85;
 const EASE = [0.22, 1, 0.36, 1] as const;
 const LAST_SLIDE = SLIDES.length - 1;
@@ -78,13 +76,10 @@ export function Experience() {
 
   const finishIntro = useCallback(() => setPhase("done"), []);
 
-  // Header wordmark words stay hidden while the intro words travel to them (WORD_EXIT_MS + stagger).
+  // Header wordmark words stay hidden until the intro overlay (and its own wordmark) has fully left the screen.
+  // Revealing on the intro's exit-complete means the two wordmarks never show at the same time.
   const [wordsRevealed, setWordsRevealed] = useState(false);
-  useEffect(() => {
-    if (phase !== "done") return;
-    const id = window.setTimeout(() => setWordsRevealed(true), reduced ? 0 : WORD_LAND_MS);
-    return () => window.clearTimeout(id);
-  }, [phase, reduced]);
+  const revealWords = useCallback(() => setWordsRevealed(true), []);
 
   useEffect(() => {
     if (phase !== "done") return;
@@ -403,7 +398,11 @@ export function Experience() {
   return (
     <MotionConfig reducedMotion="user">
       <LayoutGroup>
-        <AnimatePresence>{phase === "intro" && <Intro key="intro" reduced={reduced} onComplete={finishIntro} />}</AnimatePresence>
+        <AnimatePresence>
+          {phase === "intro" && (
+            <Intro key="intro" reduced={reduced} onComplete={finishIntro} onWordsLanded={revealWords} />
+          )}
+        </AnimatePresence>
 
         {/* Header is mounted from the start (under the intro overlay) so the intro words have real targets to measure. */}
         <Header

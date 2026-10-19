@@ -39,9 +39,11 @@ function measureWordExit(sourceId: string, targetId: string): WordExit | null {
 interface IntroProps {
   reduced: boolean;
   onComplete: () => void;
+  /** Fires when the intro words have landed on their header slots (header words take over). */
+  onWordsLanded?: () => void;
 }
 
-export function Intro({ reduced, onComplete }: IntroProps) {
+export function Intro({ reduced, onComplete, onWordsLanded }: IntroProps) {
   const { t } = useLanguage();
   const [scramble, setScramble] = useState<Record<string, ShardScramble> | null>(null);
   const [ready, setReady] = useState(false);
@@ -64,24 +66,37 @@ export function Intro({ reduced, onComplete }: IntroProps) {
       requestAnimationFrame(onComplete);
     };
 
-    if (reduced) {
-      const id = window.setTimeout(finish, 800);
-      return () => window.clearTimeout(id);
-    }
+    // Reduced motion has no word travel, so the header words are shown with the overlay exit.
+    const finishAt = reduced ? 800 : INTRO_TOTAL_MS;
+    const completeId = window.setTimeout(finish, finishAt);
 
-    // At 2.75s, loading is complete and logo is fully assembled. Transition to header begins.
-    const completeId = window.setTimeout(finish, INTRO_TOTAL_MS);
-    return () => window.clearTimeout(completeId);
-  }, [reduced, onComplete]);
+    // Header words take over exactly when the intro words land, so the handoff has no empty frame.
+    const landedId = reduced
+      ? window.setTimeout(() => onWordsLanded?.(), finishAt)
+      : window.setTimeout(() => onWordsLanded?.(), INTRO_TOTAL_MS + WORD_STAGGER_MS + WORD_EXIT_MS);
+
+    return () => {
+      window.clearTimeout(completeId);
+      window.clearTimeout(landedId);
+    };
+  }, [reduced, onComplete, onWordsLanded]);
 
   /** Each word glides to its header slot and scales from the intro size to the header size. */
+  // Intro words land at WORD_STAGGER_MS + WORD_EXIT_MS; onWordsLanded fires then so the header words take over.
+  // The intro word fades out as it lands, so it never sits on top of the header copy (no double image / shadow).
   const wordExit = (exit: WordExit | undefined, delayMs: number) =>
     exit
       ? {
           x: exit.x,
           y: exit.y,
           scale: exit.scale,
-          transition: { duration: WORD_EXIT_MS / 1000, delay: delayMs / 1000, ease: EASE },
+          opacity: 0,
+          transition: {
+            x: { duration: WORD_EXIT_MS / 1000, delay: delayMs / 1000, ease: EASE },
+            y: { duration: WORD_EXIT_MS / 1000, delay: delayMs / 1000, ease: EASE },
+            scale: { duration: WORD_EXIT_MS / 1000, delay: delayMs / 1000, ease: EASE },
+            opacity: { duration: 0.2, delay: (delayMs + WORD_EXIT_MS - 200) / 1000, ease: "linear" },
+          },
         }
       : { opacity: 0, transition: { duration: 0.4, ease: EASE } };
 

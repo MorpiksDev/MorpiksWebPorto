@@ -4,6 +4,9 @@ import { motion, type TargetAndTransition } from "framer-motion";
 import { useLanguage } from "./LanguageProvider";
 import { TAGLINE } from "@/lib/content";
 
+/** Header words fade in over a short, eased window instead of snapping on (no visible flicker). */
+const WORD_REVEAL = { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const };
+
 interface WordmarkProps {
   size?: "sm" | "lg";
   showTagline?: boolean;
@@ -34,9 +37,15 @@ export function Wordmark({ size = "sm", showTagline = true, wordIds, wordExit, w
             MORPIKS
           </motion.span>
         ) : (
-          <span id="header-word-brand" className="inline-block font-extrabold" style={{ opacity: wordsHidden ? 0 : 1 }}>
+          <motion.span
+            id="header-word-brand"
+            className="inline-block font-extrabold"
+            initial={false}
+            animate={{ opacity: wordsHidden ? 0 : 1 }}
+            transition={WORD_REVEAL}
+          >
             MORPIKS
-          </span>
+          </motion.span>
         )}{" "}
         {animated ? (
           <motion.span
@@ -48,9 +57,15 @@ export function Wordmark({ size = "sm", showTagline = true, wordIds, wordExit, w
             SOLUTIONS
           </motion.span>
         ) : (
-          <span id="header-word-solutions" className="inline-block font-light" style={{ opacity: wordsHidden ? 0 : 1 }}>
+          <motion.span
+            id="header-word-solutions"
+            className="inline-block font-light"
+            initial={false}
+            animate={{ opacity: wordsHidden ? 0 : 1 }}
+            transition={WORD_REVEAL}
+          >
             SOLUTIONS
-          </span>
+          </motion.span>
         )}
       </p>
       {showTagline && (
