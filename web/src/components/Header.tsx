@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { ChameleonLogo } from "./ChameleonLogo";
 import { Wordmark } from "./Wordmark";
 import { useLanguage } from "./LanguageProvider";
@@ -9,38 +10,89 @@ import { UI } from "@/lib/content";
 interface HeaderProps {
   onHome: () => void;
   onCta: () => void;
-  inContact?: boolean;
+  /** Brand logo is shown here (false while the contact view owns it or a flight is in progress). */
+  brandVisible?: boolean;
+  /** Switch without fading (flight hand-off). When false, the visibility change fades. */
+  instant?: boolean;
+  /** Header wordmark words are shown. False while the intro words are still travelling to them. */
+  wordsRevealed?: boolean;
+  /** Logo slot is open (takes width). Closed only after the logo has landed in the contact view. */
+  slotOpen?: boolean;
 }
 
-/** PRD 6.2: logo + wordmark settle top-left. Hero CTA top-right (PRD 10.1). */
-export function Header({ onHome, onCta, inContact = false }: HeaderProps) {
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+/** Logo slot width: 32px on mobile, 44px on sm+ (matches w-8 / sm:w-11). */
+const LOGO_WIDTH_MOBILE = 32;
+const LOGO_WIDTH_SM = 44;
+const SM_BREAKPOINT = 640; // Tailwind sm
+
+/** Current expanded logo width in px, read from the viewport (kept in sync on resize). */
+function useLogoWidth(): number {
+  const [width, setWidth] = useState(LOGO_WIDTH_MOBILE);
+  useEffect(() => {
+    const update = () => setWidth(window.innerWidth >= SM_BREAKPOINT ? LOGO_WIDTH_SM : LOGO_WIDTH_MOBILE);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return width;
+}
+
+/**
+ * PRD 6.2: logo + wordmark settle top-left. Hero CTA top-right (PRD 10.1).
+ * Intro shards fly into the brand logo via shared layoutIds. In contact view the brand logo
+ * fades out in place (its slot is kept so the wordmark does not shift); the contact panel owns the logo there.
+ */
+export function Header({
+  onHome,
+  onCta,
+  brandVisible = true,
+  instant = false,
+  wordsRevealed = true,
+  slotOpen = true,
+}: HeaderProps) {
   const { t } = useLanguage();
-  const wordmarkTransition = { layout: { duration: 0.85, ease: [0.22, 1, 0.36, 1] as const } };
+  const logoWidth = useLogoWidth();
 
   return (
     <header className="header-surface fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 py-3 transition-colors sm:px-10 sm:py-4">
       <div className="flex items-center gap-2.5 rounded-full bg-mist/40 px-3 py-1.5 backdrop-blur-sm sm:gap-3.5 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <div id="header-logo" className="relative w-8 shrink-0 sm:w-11">
-          {/* Permanent Brand Logo: ALWAYS visible in top-left, receives intro shards */}
-          <ChameleonLogo shardLayoutPrefix="brand-chameleon" className="w-full" interactive={true} />
-
-          {/* Contact Stream Emitter: When !inContact, rests at Header. When inContact, unmounts from Header and mounts in ContactPanel! */}
-          {!inContact && (
-            <div className="absolute inset-0 pointer-events-none opacity-0">
-              <ChameleonLogo shardLayoutPrefix="contact-stream" className="w-full" interactive={false} />
-            </div>
-          )}
-        </div>
+        {/*
+         * Logo slot: collapses to zero width while the contact view owns the logo, so the wordmark slides left
+         * to close the gap, and re-expands when the logo flies back. Width is animated via the layout system
+         * (not per-frame style writes), so the wordmark follows smoothly.
+         */}
+        <motion.div
+          className="relative shrink-0 overflow-hidden"
+          initial={false}
+          animate={{ width: slotOpen ? logoWidth : 0 }}
+          transition={{ width: { duration: 0.6, ease: EASE } }}
+        >
+          <motion.div
+            id="header-logo"
+            className="relative"
+            style={{ width: logoWidth, pointerEvents: brandVisible ? undefined : "none" }}
+            initial={false}
+            animate={{ opacity: brandVisible ? 1 : 0 }}
+            transition={{ duration: instant ? 0 : 0.45, ease: EASE }}
+            aria-hidden={!brandVisible || undefined}
+          >
+            <ChameleonLogo shardLayoutPrefix="brand-chameleon" className="w-full" interactive={brandVisible} />
+          </motion.div>
+        </motion.div>
         <motion.button
-          layoutId="brand-wordmark"
-          transition={wordmarkTransition}
+          initial={{ opacity: wordsRevealed ? 1 : 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2, ease: EASE }}
           type="button"
           id="header-home"
           onClick={onHome}
           className="rounded-lg px-1 py-0.5 text-left transition-colors hover:opacity-80 focus-visible:bg-mist"
           aria-label="Morpiks Solutions, back to start"
         >
-          <Wordmark />
+          {/* Words stay hidden until the intro words have landed on them (see Intro). */}
+          <Wordmark wordsHidden={!wordsRevealed} />
         </motion.button>
       </div>
 

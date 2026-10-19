@@ -107,7 +107,6 @@ body {
   inset: 0;
   pointer-events: none;
   backface-visibility: visible;
-  will-change: transform;
 }
 
 .logo-layer svg {

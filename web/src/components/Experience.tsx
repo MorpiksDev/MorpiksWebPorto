@@ -3,6 +3,7 @@
 import { AnimatePresence, LayoutGroup, MotionConfig, animate, useReducedMotion, type AnimationPlaybackControls } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactPanel } from "./ContactPanel";
+import { FLIGHT_MS, LogoFlight, type LogoRect } from "./LogoFlight";
 import { Header } from "./Header";
 import { Intro } from "./Intro";
 import { Nav, type NavTarget } from "./Nav";
@@ -11,6 +12,8 @@ import { Slider } from "./Slider";
 import { SLIDES, type Subject } from "@/lib/content";
 
 const NAV_REVEAL_DELAY_MS = 500; // PRD 6.3
+// Intro word exit: 120ms stagger + 850ms travel, so the header words are revealed as they land.
+const WORD_LAND_MS = 120 + 850;
 const SCROLL_DURATION = 0.85;
 const EASE = [0.22, 1, 0.36, 1] as const;
 const LAST_SLIDE = SLIDES.length - 1;
@@ -19,6 +22,18 @@ const LAST_SLIDE = SLIDES.length - 1;
 const SECTION = { slider: 0, about: 1, approach: 2, contact: 3 } as const;
 
 type Axis = "scrollLeft" | "scrollTop";
+type LogoOwner = "header" | "contact";
+interface FlightState {
+  from: LogoRect;
+  /** Null holds the shards at `from` while the page scrolls away. */
+  to: LogoRect | null;
+}
+
+/** Viewport box of the element with this id, or null when it is not mounted. */
+function measure(id: string): LogoRect | null {
+  const r = document.getElementById(id)?.getBoundingClientRect();
+  return r ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
+}
 
 export function Experience() {
   const reduced = useReducedMotion() ?? false;
@@ -39,13 +54,37 @@ export function Experience() {
   const nameRef = useRef<HTMLInputElement>(null);
   const anims = useRef<Partial<Record<Axis, AnimationPlaybackControls>>>({});
 
+  // Logo hand-off between header and contact view (see runLogoTransition).
+  const [flight, setFlight] = useState<FlightState | null>(null);
+  const [logoOwner, setLogoOwner] = useState<LogoOwner>("header");
+  const flyingRef = useRef(false); // input lock for the duration of a flight
+  const flightTimer = useRef<number | undefined>(undefined);
+  const snapSettle = useRef<number | undefined>(undefined);
+  // Always points at the latest logo-transition starter, so the once-registered scroll listener never goes stale.
+  const transitionRef = useRef<(toContact: boolean) => void>(() => {});
+  useEffect(
+    () => () => {
+      window.clearTimeout(flightTimer.current);
+      window.clearTimeout(snapSettle.current);
+    },
+    [],
+  );
+
   // Latest values for event handlers registered once.
-  const state = useRef({ activeSlide, activeSection, phase });
-  state.current = { activeSlide, activeSection, phase };
+  const state = useRef({ activeSlide, activeSection, phase, logoOwnerContact: false });
+  state.current = { activeSlide, activeSection, phase, logoOwnerContact: logoOwner === "contact" };
 
   /* ---------- Intro -> hero ---------- */
 
   const finishIntro = useCallback(() => setPhase("done"), []);
+
+  // Header wordmark words stay hidden while the intro words travel to them (WORD_EXIT_MS + stagger).
+  const [wordsRevealed, setWordsRevealed] = useState(false);
+  useEffect(() => {
+    if (phase !== "done") return;
+    const id = window.setTimeout(() => setWordsRevealed(true), reduced ? 0 : WORD_LAND_MS);
+    return () => window.clearTimeout(id);
+  }, [phase, reduced]);
 
   useEffect(() => {
     if (phase !== "done") return;
@@ -82,20 +121,70 @@ export function Experience() {
     [reduced],
   );
 
+  /**
+   * Hand the logo between the header (top-left) and the contact panel.
+   * Entering: scroll to contact first, then the 24 shards fly from the header logo to the contact logo.
+   * Leaving: the shards are held at the contact logo while the page scrolls to the hero, then fly back to the header.
+   * Reduced motion skips the flight and only cross-fades the logo.
+   */
+  const runLogoTransition = useCallback(
+    (toContact: boolean, scroll: (done: () => void) => void, onDone?: () => void) => {
+      const settle = () => {
+        setFlight(null);
+        setLogoOwner(toContact ? "contact" : "header");
+        flyingRef.current = false;
+        onDone?.();
+      };
+
+      if (reduced) {
+        scroll(settle);
+        return;
+      }
+
+      flyingRef.current = true;
+      const heldFrom = toContact ? null : measure("contact-logo");
+      if (heldFrom) setFlight({ from: heldFrom, to: null });
+
+      scroll(() => {
+        const from = toContact ? measure("header-logo") : heldFrom;
+        const to = measure(toContact ? "contact-logo" : "header-logo");
+        if (!from || !to) {
+          settle();
+          return;
+        }
+        setFlight({ from, to });
+        flightTimer.current = window.setTimeout(settle, FLIGHT_MS);
+      });
+    },
+    [reduced],
+  );
+
+  // Native-scroll transitions: the flight runs once the page is at rest on its new section.
+  // Entering contact: the page is already at contact, so the flight lands on the settled contact slot.
+  // Leaving contact: the flight starts from the settled contact slot and lands on the header.
+  useEffect(() => {
+    transitionRef.current = (toContact: boolean) => runLogoTransition(toContact, (done) => done());
+  }, [runLogoTransition]);
+
   const goToSection = useCallback(
     (index: number, onDone?: () => void) => {
       const el = sectionRefs.current[index];
-      if (!el) return;
+      if (!el || flyingRef.current) return;
+      const from = state.current.activeSection;
       setActiveSection(index);
-      scrollTo(vRef.current, "scrollTop", el.offsetTop, onDone);
+
+      const scroll = (done: () => void) => scrollTo(vRef.current, "scrollTop", el.offsetTop, done);
+      if (index === SECTION.contact && from !== SECTION.contact) runLogoTransition(true, scroll, onDone);
+      else if (index !== SECTION.contact && from === SECTION.contact) runLogoTransition(false, scroll, onDone);
+      else scroll(() => onDone?.());
     },
-    [scrollTo],
+    [scrollTo, runLogoTransition],
   );
 
   const goToSlide = useCallback(
     (index: number) => {
       const track = hRef.current;
-      if (!track) return;
+      if (!track || flyingRef.current) return;
       const i = Math.max(0, Math.min(LAST_SLIDE, index));
       setActiveSlide(i);
       scrollTo(track, "scrollLeft", i * track.clientWidth);
@@ -130,6 +219,22 @@ export function Experience() {
         }
       });
       setActiveSection(best);
+
+      // Native scroll (touch, trackpad, scrollbar) crossing into or out of the contact panel. The flight runs
+      // once the page has settled on its snap point. Programmatic scrolls return early above, so this only
+      // fires for user-driven scrolls.
+      const wasContact = state.current.logoOwnerContact;
+      const isContact = best === SECTION.contact;
+      if (wasContact !== isContact && !flyingRef.current) {
+        window.clearTimeout(snapSettle.current);
+        snapSettle.current = window.setTimeout(() => {
+          if (flyingRef.current) return;
+          // Re-check the settled position: the user may have scrolled back across the boundary.
+          const settledContact = state.current.activeSection === SECTION.contact;
+          if (settledContact === state.current.logoOwnerContact) return;
+          transitionRef.current(settledContact);
+        }, 120);
+      }
     };
 
     track.addEventListener("scroll", onH, { passive: true });
@@ -195,6 +300,17 @@ export function Experience() {
           if (now - lockStart < 700) return;
           lockStart = now;
           goToSlide(LAST_SLIDE);
+        }
+      } else if (section === SECTION.approach || section === SECTION.contact) {
+        // Scrolling up out of Approach/Contact steps back one section. Leaving Contact here also
+        // runs the logo return flight (goToSection handles the contact -> other transition).
+        if (Math.abs(e.deltaY) < 10) return;
+        if (e.deltaY < 0) {
+          e.preventDefault();
+          const now = performance.now();
+          if (now - lockStart < 700 || flyingRef.current) return;
+          lockStart = now;
+          goToSection(section - 1);
         }
       }
     };
@@ -289,13 +405,17 @@ export function Experience() {
       <LayoutGroup>
         <AnimatePresence>{phase === "intro" && <Intro key="intro" reduced={reduced} onComplete={finishIntro} />}</AnimatePresence>
 
-        {phase === "done" && (
-          <Header
-            onHome={() => goToSlide(0)}
-            onCta={onCta}
-            inContact={activeSection === SECTION.contact}
-          />
-        )}
+        {/* Header is mounted from the start (under the intro overlay) so the intro words have real targets to measure. */}
+        <Header
+          onHome={() => goToSlide(0)}
+          onCta={onCta}
+          brandVisible={phase === "done" && logoOwner === "header" && !flight}
+          instant={!reduced}
+          wordsRevealed={wordsRevealed}
+          slotOpen={logoOwner === "header" || flight !== null}
+        />
+
+        {flight && <LogoFlight from={flight.from} to={flight.to} />}
 
         <main
           ref={vRef}
@@ -337,7 +457,8 @@ export function Experience() {
           <section id="contact" ref={setSectionRef(SECTION.contact)} className={panelClass}>
             <ContactPanel
               ref={nameRef}
-              active={activeSection === SECTION.contact}
+              logoVisible={logoOwner === "contact" && !flight}
+              instant={!reduced}
               subject={subject}
               onSubjectChange={setSubject}
               onCta={onCta}

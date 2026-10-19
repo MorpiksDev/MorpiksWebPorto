@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, type Transition } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   EYE,
   LOGO_COLORS,
@@ -187,7 +187,8 @@ interface ShardLayerProps {
   onFlip: (id: string) => void;
 }
 
-function ShardLayer({
+/* Memoized so a hover change only re-renders the shard that actually changed, not all 24. */
+const ShardLayer = memo(function ShardLayer({
   shard,
   shardIndex,
   shardLayoutPrefix,
@@ -215,7 +216,7 @@ function ShardLayer({
 
   // Staggered piece-by-piece departure: snout -> face -> temple -> crest -> body -> limbs -> tail
   const tearRank = TEAR_ORDER[shard.id] ?? shardIndex;
-  const tearDelay = tearRank * 0.032;
+  const tearDelay = tearRank * 0.015; // last shard starts at ~0.35s so the whole flight settles with the header
 
   const layoutTransition: Transition = {
     duration: 0.85,
@@ -285,4 +286,4 @@ function ShardLayer({
       </motion.div>
     </motion.div>
   );
-}
+});

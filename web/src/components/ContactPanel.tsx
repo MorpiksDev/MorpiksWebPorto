@@ -9,7 +9,10 @@ import { Eyebrow, reveal, revealTransition } from "./Panels";
 import { COMPANY, CONTACT, TAGLINE, UI, type Subject } from "@/lib/content";
 
 interface ContactPanelProps {
-  active?: boolean;
+  /** Contact logo is shown here (false while the header owns it or a flight is in progress). */
+  logoVisible?: boolean;
+  /** Switch without fading (flight hand-off). When false, the visibility change fades. */
+  instant?: boolean;
   subject: Subject;
   onSubjectChange: (s: Subject) => void;
   onCta: () => void;
@@ -17,7 +20,7 @@ interface ContactPanelProps {
 
 /** PRD 10: form + contact details, WhatsApp secondary CTA, footer CTA. */
 export const ContactPanel = forwardRef<HTMLInputElement, ContactPanelProps>(function ContactPanel(
-  { active = false, subject, onSubjectChange, onCta },
+  { logoVisible = false, instant = false, subject, onSubjectChange, onCta },
   nameRef,
 ) {
   const { t } = useLanguage();
@@ -27,18 +30,18 @@ export const ContactPanel = forwardRef<HTMLInputElement, ContactPanelProps>(func
     <div className="mx-auto flex w-full max-w-7xl flex-col">
       <div className="grid gap-10 lg:grid-cols-12 lg:gap-14">
         <motion.div className="lg:col-span-5" {...reveal} transition={revealTransition()}>
-          <div className="mb-5 w-32 sm:w-40 lg:w-48" style={{ aspectRatio: "352 / 370" }}>
-            {active ? (
-              <ChameleonLogo
-                shardLayoutPrefix="contact-stream"
-                interactive={true}
-                className="w-full"
-                label="Morpiks chameleon logo"
-              />
-            ) : (
-              <div className="w-full h-full" aria-hidden="true" />
-            )}
-          </div>
+          {/* Contact logo slot: the logo flight lands here; visibility is driven by Experience. */}
+          <motion.div
+            id="contact-logo"
+            className="mb-5 w-32 sm:w-40 lg:w-48"
+            style={{ aspectRatio: "352 / 370", pointerEvents: logoVisible ? undefined : "none" }}
+            initial={false}
+            animate={{ opacity: logoVisible ? 1 : 0 }}
+            transition={{ duration: instant ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+            aria-hidden={!logoVisible || undefined}
+          >
+            <ChameleonLogo interactive={logoVisible} className="w-full" label="Morpiks chameleon logo" />
+          </motion.div>
           <Eyebrow>{t(CONTACT.eyebrow)}</Eyebrow>
           <h2 className="mt-3 text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl lg:text-5xl">
             {t(CONTACT.heading)}
