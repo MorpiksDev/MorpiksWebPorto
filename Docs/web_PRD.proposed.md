@@ -1,22 +1,23 @@
 # Web PRD - Morpiks Solutions (Proposed)
 
 > Proposed revision of `web_PRD.md`. The original file is unchanged.
-> Decisions marked **[Q#]** come from the design grilling session. Open items are listed in section 12.
+> Decisions marked **[Q#]** come from the design grilling session. No open items remain.
 
 ---
 
 ## 1. Overview
 
-Apple-inspired, flat, clean marketing site for Morpiks Solutions. Single-page experience with a horizontal portfolio slider and a vertical company/contact section, navigated by a centered floating bar. Tagline: *Evolve Beyond Limits*.
+Apple-inspired, flat, clean marketing site for Morpiks Solutions. Single-page experience with a horizontal portfolio slider and a vertical company/contact section, navigated by a centred floating bar. Tagline: *Evolve Beyond Limits*.
 
 ---
 
 ## 2. Tech Stack
 
-- **Framework:** Next.js (App Router) **[assumed, see 12]**
+- **Framework:** Next.js, **App Router** **[Q21]**
 - **Styling:** Tailwind CSS
 - **Motion:** Framer Motion
-- **Email:** Resend, called from a Next.js API route **[Q13]**
+- **Scroll:** native CSS scroll-snap on both axes, with a wheel handler **[Q22]**
+- **Email:** Resend, called from a Next.js route handler **[Q13, Q21]**
 - **Hosting:** Vercel **[Q14]**
 
 ---
@@ -51,7 +52,7 @@ Apple-inspired, flat, clean marketing site for Morpiks Solutions. Single-page ex
 | Obsidian Black | `#111111` | Primary text, logo base |
 | Graphite | `#333333` | Secondary text |
 | Steel Gray | `#777777` | Hover state, muted text |
-| Mist Gray | `#D9D9D9` | Dividers-as-fills, subtle backgrounds |
+| Mist Gray | `#D9D9D9` | Subtle backgrounds |
 | Off-White | `#FAFAFA` | Page background |
 
 No gradients, shadows, or borders anywhere in the UI.
@@ -61,7 +62,7 @@ No gradients, shadows, or borders anywhere in the UI.
 ## 5. Typography
 
 - **Brand:** Montserrat (see 3.4).
-- **Content (headings, body, UI labels, buttons):** `-apple-system, "SF Pro Display", "Inter", system-ui, sans-serif`. SF Pro is used on Apple devices; Inter is the fallback elsewhere. **[Q5]**
+- **Content (headings, body, UI labels, buttons):** `-apple-system, "SF Pro Display", "Inter", system-ui, sans-serif`. SF Pro on Apple devices, Inter elsewhere. **[Q5]**
 
 ---
 
@@ -69,25 +70,30 @@ No gradients, shadows, or borders anywhere in the UI.
 
 ### 6.1 Intro (plays on every page load) **[Q12]**
 - Full-viewport blocking overlay, logo centred.
-- The logo's shards are scrambled with a 3D cube-style transform and then return to their original positions.
+- Shards are scrambled with a 3D cube-style transform, then return to their original positions.
 - Scramble pattern is **randomised on each load**, always settling into the same final arrangement. **[Q18]**
 - Total duration: **3 seconds**.
 - Loading bar directly below the logo, filling over the same 3 seconds.
-- No `sessionStorage`; the intro replays on every load and every visitor visit. **[Q12]**
+- No `sessionStorage`; the intro replays on every load.
+
+#### 6.1.1 Reduced motion **[Q20]**
+- When `prefers-reduced-motion` is set, the 3D scramble is replaced by a **0.5-second opacity fade** of the logo into its final position.
+- The loading bar still fills over 3 seconds, without the 3D transform.
+- The nav reveal follows the fade.
 
 ### 6.2 Transition to hero
 - When the intro completes, the shards move to the top-left corner as the logo hero.
 - The wordmark (MORPIKS SOLUTIONS) transitions to the top-left alongside the logo.
 
-### 6.3 Navigation reveal **[Q-PRD]**
-- Navigation block expands after **500ms** on page load, animating its content in with it. **[Q4]**
+### 6.3 Navigation reveal **[Q4]**
+- Navigation block expands after **500ms** on page load, animating its content in with it.
 
 ---
 
 ## 7. Navigation
 
 ### 7.1 Style
-- Centred, bottom-positioned, semi-floating bar on desktop **and** mobile (same design). **[PRD]**
+- Centred, bottom-positioned, semi-floating bar on desktop **and** mobile (same design).
 - Flat: no shadows, gradients, borders, or icons. Text and background colour only.
 - Whole block and its content animate together, including during content transitions.
 
@@ -106,7 +112,7 @@ Portfolio and Services jump to their slide. About and Contact jump to their vert
 
 ### 8.1 Horizontal section: Portfolio slider
 - Shown first on page load.
-- Auto-advances every **5 seconds**. **[PRD]**
+- Auto-advances every **5 seconds**.
 - **Pause** on hover and on focus. **[Q11]**
 - Visible pause/play control. **[Q11]**
 - `prefers-reduced-motion`: auto-advance disabled entirely. **[Q11]**
@@ -125,13 +131,13 @@ Portfolio and Services jump to their slide. About and Contact jump to their vert
 | 8 | Furniture Design & Fabrication | `service-furniture-design.jpg` | Context.md |
 | 9 | Industrial & Office Procurement | `service-procurement.jpg` | Context.md |
 
-- There is no separate hero slide; slide 1 is the End-to-End image. **[Q19]**
-- System Integration has no image and is combined into slide 6. **[Q15]**
+- No separate hero slide; slide 1 is the End-to-End image.
+- System Integration has no image and is combined into slide 6.
 - Every slide has descriptive alt text.
 
 ### 8.2 Vertical section: About and Contact
 - Smooth vertical scroll with snap between the About and Contact panels.
-- Shows company info (About) and contact info (Contact).
+- About shows company info; Contact shows the form and contact details.
 
 ### 8.3 Connection between sections **[Q10]**
 - Scroll down or swipe up on the slider moves to the vertical section.
@@ -139,11 +145,17 @@ Portfolio and Services jump to their slide. About and Contact jump to their vert
 - Nav items jump directly to their target.
 - Both directions use scroll-snap, so the scroll lock still applies.
 
+### 8.4 Scroll implementation **[Q22]**
+- CSS scroll-snap on both axes: horizontal for the slider, vertical for About/Contact.
+- A wheel handler maps vertical wheel input to horizontal steps while the slider is active.
+- Framer Motion animates the transitions between snap points.
+- No custom scroll engine.
+
 ---
 
 ## 9. Scroll Lock
 
-- CSS Scroll Snapping on both axes: horizontal for the slider, vertical for About/Contact.
+- CSS Scroll Snapping on both axes.
 - The page has no free scroll; each step lands on a snap point.
 
 ---
@@ -151,20 +163,27 @@ Portfolio and Services jump to their slide. About and Contact jump to their vert
 ## 10. Contact
 
 ### 10.1 Form
-- Fields: name, email, message (plus any other required fields agreed later).
+- Fields: name, email, message.
 - Client-side validation of required fields.
-- Visible CTA in hero and footer. **[PRD]**
-- Primary CTA: **Book a consultation**, matching the Portfolio document. **[Context/Portfolio]**
+- Visible CTA in hero and footer.
+- Primary CTA: **Book a consultation**. Scrolls to the Contact panel and pre-selects "consultation" as the subject. **[Q25]**
+- No third-party scheduler.
 
-### 10.2 Delivery **[Q13, Q17]**
-- Submission posts to a Next.js API route.
+### 10.2 Delivery **[Q13, Q17, Q23]**
+- Submission posts to a Next.js route handler.
 - The route sends the enquiry through **Resend** to **info@morpiks.com**.
-- Sender: `no-reply@morpiks.com`; `Reply-To` is the visitor's email. **[Q17]**
-- **Before launch:** DNS records for morpiks.com must be added so Resend can verify the sending domain.
-- **Until then:** test using Resend's sandbox sender.
+- Sender: `no-reply@morpiks.com`; `Reply-To` is the visitor's email.
+- **Before launch:** DNS records for morpiks.com are added so Resend can verify the sending domain. The owner has DNS access.
+- **Until verified:** test using Resend's sandbox sender.
 
-### 10.3 WhatsApp
-- Optional secondary CTA linking to WhatsApp. Number is still TBC (see 12). **[Q13]**
+### 10.3 WhatsApp **[Q24]**
+- Optional secondary CTA in the Contact panel.
+- Number: **+62 813-8499-0143** (`wa.me/6281384990143`).
+
+### 10.4 Contact details
+- Email: info@morpiks.com
+- WhatsApp: +62 813-8499-0143
+- Location: Bogor, Jawa Barat - Indonesia
 
 ---
 
@@ -174,19 +193,25 @@ Portfolio and Services jump to their slide. About and Contact jump to their vert
 - Readable contrast on the palette (`#111111` on `#FAFAFA`; check `#777777` for body text).
 - Alt text on all images and the logo.
 - Visible focus states (no shadows or borders, so use a text or background change).
-- `prefers-reduced-motion`: disable slider auto-advance. **[Q11]**
+- `prefers-reduced-motion`: slider auto-advance disabled; intro replaced by the fade in 6.1.1. **[Q11, Q20]**
 
 ---
 
-## 12. Open Items and Assumptions
+## 12. Scope
 
-These were not decided in the grilling session. Confirm before implementation.
+- **In scope:** everything above.
+- **Out of scope for this phase:** Insights section (no content yet) **[Q6, Q26]**; team profiles (optional, not in Portfolio.md) **[Q26]**. Both can be added later without changing the layout.
 
-- [ ] **Intro under reduced motion:** the 3-second intro was not covered by the reduced-motion decision. Proposal: shorten it to a fade with no 3D transform. **Needs confirmation.**
-- [ ] **Next.js router:** App Router assumed. **Needs confirmation.**
-- [ ] **Resend DNS:** morpiks.com records needed before launch.
-- [ ] **WhatsApp number:** TBC.
-- [ ] **Booking link:** placeholder in Portfolio.md; needed for the CTA.
-- [ ] **Insights section:** removed from scope (no content). Add back when content exists. **[Q6]**
-- [ ] **Team profiles:** not in scope.
-- [ ] **Scroll implementation:** nested CSS scroll-snap across horizontal and vertical containers can be fragile with wheel input. Proposal: use CSS snap as the base and drive transitions with Framer Motion, keeping the behaviour in section 9.
+---
+
+## 13. Resolved Decisions Log
+
+| Item | Decision | Ref |
+|---|---|---|
+| Intro under reduced motion | 0.5s opacity fade, loading bar unchanged | Q20 |
+| Router | App Router | Q21 |
+| Scroll approach | CSS snap + wheel handler + Framer Motion | Q22 |
+| Resend DNS | Owner has access; sandbox until verified | Q23 |
+| WhatsApp | Number provided, shown as secondary CTA | Q24 |
+| Booking CTA | Site contact form, subject pre-selected | Q25 |
+| Insights and team profiles | Excluded from this phase | Q26 |
